@@ -49,7 +49,7 @@ instance Functor (Rule n) where
 
 instance Applicative (Rule n) where
     pure = Const
-    r2 <*> r1 = Apply r2 r1
+    (<*>) = Apply
 
 instance Alternative (Rule n) where
     empty = Failed "empty"
