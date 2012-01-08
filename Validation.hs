@@ -86,7 +86,40 @@ ruleDoc (Foreach things r) = vcat [ text "for each of"
                                   , nest 2 $ ruleDoc r
                                   ]
 
--- Some example rules.
+-- Apply a rule to a node, yielding the value checked and computed by
+-- the rule.
+apply :: n -> Rule n a -> Either String a
+apply _ (Const a) = Right a
+apply _ (Failed e) = Left e
+apply n (Rule _ f) = apply n (f n)
+apply n (Apply r2 r1) = do
+  f <- apply n r2
+  v <- apply n r1
+  return $ f v
+apply n (Foreach things r) = do
+  values <- apply n things
+  mapM (flip apply r) values
+apply n (OneOf rs) =
+    let results = apply n <$> rs
+        successes = rights results
+        failures = lefts results
+    in if not $ null successes
+       then Right $ head successes
+       else Left $ "No rules matched: " ++ intercalate ", " failures
+apply n (Compose r2 r1) = do
+  v <- apply n r1
+  apply v r2
+
+-- Rules.
+getChild :: Int -> Rule Node Node
+getChild num = Rule ("Get child node " ++ show num) $
+               \n -> if (length $ children n) < num + 1
+                     then Failed $ "Child " ++ show num ++ " not found"
+                     else pure $ children n !! num
+
+getChildren :: Rule Node [Node]
+getChildren = Rule "Get child nodes" (pure . children)
+
 intNode :: Rule Node Int
 intNode = Rule "the node has an integer value" $
           \n -> case reads $ nodeVal n of
@@ -113,39 +146,6 @@ fooRule = Rule "foo has content 5" $
           \foo -> if fooContent foo == 5
                   then pure $ fooContent foo
                   else Failed "fooContent is wrong"
-
--- Apply a rule to a node, yielding the value checked and computed by
--- the rule.
-apply :: n -> Rule n a -> Either String a
-apply _ (Const a) = Right a
-apply _ (Failed e) = Left e
-apply n (Rule _ f) = apply n (f n)
-apply n (Apply r2 r1) = do
-  f <- apply n r2
-  v <- apply n r1
-  return $ f v
-apply n (Foreach things r) = do
-  values <- apply n things
-  mapM (flip apply r) values
-apply n (OneOf rs) =
-    let results = apply n <$> rs
-        successes = rights results
-        failures = lefts results
-    in if not $ null successes
-       then Right $ head successes
-       else Left $ "No rules matched: " ++ intercalate ", " failures
-apply n (Compose r2 r1) = do
-  v <- apply n r1
-  apply v r2
-
-getChild :: Int -> Rule Node Node
-getChild num = Rule ("Get child node " ++ show num) $
-               \n -> if (length $ children n) < num + 1
-                     then Failed $ "Child " ++ show num ++ " not found"
-                     else pure $ children n !! num
-
-getChildren :: Rule Node [Node]
-getChildren = Rule "Get child nodes" (pure . children)
 
 main :: IO ()
 main = do
