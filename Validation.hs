@@ -91,10 +91,25 @@ hasChildren num = Custom ("The node has " ++ show num ++ " children") $
                         then pure ()
                         else Failed $ show num ++ " children required"
 
+getChild :: Node -> Int -> Either String Node
+getChild n num
+    | (length $ children n) < num + 1 =
+        Left $ "Child " ++ show num ++ " not found"
+    | otherwise = Right $ children n !! num
+
 -- Apply a rule to a node, yielding the value checked and computed by
 -- the rule.
 apply :: Node -> Rule a -> Either String a
 apply _ (Const a) = Right a
+apply _ (Failed e) = Left e
+apply n (Custom _ f) = apply n (f n)
+apply n (Child num r) = do
+  child <- getChild n num
+  apply child r
+apply n (Apply r2 r1) = do
+  f <- apply n r2
+  v <- apply n r1
+  return $ f v
 apply n (AllChildren r) = go [] (children n)
     where
       go vals [] = return vals
@@ -102,17 +117,6 @@ apply n (AllChildren r) = go [] (children n)
         -- Fail on children for which the rule is not satisfied.
         val <- apply c r
         go (vals ++ [val]) cs
-apply n (Child num r) =
-    if ((length $ children n) - 1) < num
-    then Left $ "Child " ++ show num ++ " not found"
-    else let child = children n !! num
-         in apply child r
-apply n (Apply r2 r1) = do
-  f <- apply n r2
-  v <- apply n r1
-  return $ f v
-apply n (Custom _ f) = apply n (f n)
-apply _ (Failed e) = Left e
 apply n (OneOf rs) = go [] rs
     where
       go es [] = Left $ "No rules matched: " ++ intercalate ", " es
