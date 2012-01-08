@@ -29,7 +29,8 @@ import Control.Applicative
 -- |Validation rules which yield validated data.  The idea is that a
 -- rule encapsulates a validation process and also returns the data
 -- which was validated.  'Rule's are parameterized on the data
--- structure type, @n@, and the rule result type, @a@.
+-- structure type under validation (@n@) and the rule result type
+-- (@a@).
 --
 -- For example, a rule which checks that a string represents an
 -- integer value would do the check and, if successful, would return
