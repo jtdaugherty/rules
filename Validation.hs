@@ -18,8 +18,8 @@ data Node = Node String Foo [Node]
 nodeVal :: Node -> String
 nodeVal (Node s _ _) = s
 
-children :: Node -> [Node]
-children (Node _ _ ns) = ns
+childNodes :: Node -> [Node]
+childNodes (Node _ _ ns) = ns
 
 -- Validation rules which yield validated data.
 data Rule n a where
@@ -110,12 +110,12 @@ apply n (Compose r2 r1) = do
 -- Rules.
 getChild :: Int -> Rule Node Node
 getChild num = Rule ("Get child node " ++ show num) $
-               \n -> if (length $ children n) < num + 1
+               \n -> if (length $ childNodes n) < num + 1
                      then Failed $ "Child " ++ show num ++ " not found"
-                     else pure $ children n !! num
+                     else pure $ childNodes n !! num
 
-getChildren :: Rule Node [Node]
-getChildren = Rule "Get child nodes" (pure . children)
+children :: Rule Node [Node]
+children = Rule "Get child nodes" (pure . childNodes)
 
 intNode :: Rule Node Int
 intNode = Rule "the node has an integer value" $
@@ -134,7 +134,7 @@ stringNode = Rule "the node has a string value" (pure . nodeVal)
 
 hasChildren :: Int -> Rule Node ()
 hasChildren num = Rule ("The node has exactly " ++ show num ++ " children") $
-                  \n -> if (length $ children n) == num
+                  \n -> if (length $ childNodes n) == num
                         then pure ()
                         else Failed $ show num ++ " children required"
 
@@ -157,8 +157,8 @@ main = do
                                <*> ((fooRule . getFoo) <|> pure 1)
                                <*> stringNode . getChild 0
                                <*> intNode . getChild 1
-                               <*> ((nodeVal <$>) <$> getChildren)
-                               <*> (Foreach getChildren $ Foreach getChildren intNode)
+                               <*> ((nodeVal <$>) <$> children)
+                               <*> (Foreach children $ Foreach children intNode)
                               )
 
   print t
