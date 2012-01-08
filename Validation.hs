@@ -23,7 +23,7 @@ childNodes (Node _ _ ns) = ns
 getChild :: Int -> Rule Node Node
 getChild num = Rule ("Get child node " ++ show num) $
                \n -> if (length $ childNodes n) < num + 1
-                     then Failed $ "Child " ++ show num ++ " not found"
+                     then failRule $ "Child " ++ show num ++ " not found"
                      else pure $ childNodes n !! num
 
 children :: Rule Node [Node]
@@ -33,13 +33,13 @@ isIntNode :: Rule Node Int
 isIntNode = Rule "the node has an integer value" $
             \n -> case reads $ nodeVal n of
                     (v,""):_ -> pure v
-                    _ -> Failed $ "Not an integer: " ++ (show $ nodeVal n)
+                    _ -> failRule $ "Not an integer: " ++ (show $ nodeVal n)
 
 isCharNode :: Rule Node Char
 isCharNode = Rule "the node has a char value" $
              \n -> if (length $ nodeVal n) == 1
                    then pure $ head $ nodeVal n
-                   else Failed $ "Not a character: " ++ (show $ nodeVal n)
+                   else failRule $ "Not a character: " ++ (show $ nodeVal n)
 
 isStringNode :: Rule Node String
 isStringNode = Rule "the node has a string value" (pure . nodeVal)
@@ -48,13 +48,13 @@ hasChildren :: Int -> Rule Node ()
 hasChildren num = Rule ("The node has exactly " ++ show num ++ " children") $
                   \n -> if (length $ childNodes n) == num
                         then pure ()
-                        else Failed $ show num ++ " children required"
+                        else failRule $ show num ++ " children required"
 
 fooRule :: Rule Foo Int
 fooRule = Rule "foo has content 5" $
           \foo -> if fooContent foo == 5
                   then pure $ fooContent foo
-                  else Failed "fooContent is wrong"
+                  else failRule "fooContent is wrong"
 
 main :: IO ()
 main = do
@@ -70,7 +70,7 @@ main = do
                                <*> isStringNode . getChild 0
                                <*> isIntNode . getChild 1
                                <*> ((nodeVal <$>) <$> children)
-                               <*> (Foreach children $ Foreach children isIntNode)
+                               <*> (foreach children $ foreach children isIntNode)
                               )
 
   print t

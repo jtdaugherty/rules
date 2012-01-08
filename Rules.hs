@@ -1,7 +1,9 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE GADTs #-}
 module Rules
-    ( Rule(..)
+    ( Rule(Rule)
+    , foreach
+    , failRule
     , apply
     , ruleDoc
     )
@@ -63,6 +65,12 @@ instance Alternative (Rule n) where
 instance Category Rule where
     id = Rule "the identity rule" (pure . id)
     r2 . r1 = Compose r2 r1
+
+foreach :: Rule a [b] -> Rule b c -> Rule a [c]
+foreach = Foreach
+
+failRule :: String -> Rule n a
+failRule = Failed
 
 ruleDoc :: Rule n a -> Doc
 ruleDoc (Pure _) = text "Constant"
