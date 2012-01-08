@@ -2,6 +2,7 @@
 {-# LANGUAGE GADTs #-}
 module Main where
 
+import Data.Either (lefts, rights)
 import Data.List (intercalate)
 import Text.PrettyPrint
 import Control.Applicative hiding (Const)
@@ -117,12 +118,13 @@ apply n (AllChildren r) = go [] (children n)
         -- Fail on children for which the rule is not satisfied.
         val <- apply c r
         go (vals ++ [val]) cs
-apply n (OneOf rs) = go [] rs
-    where
-      go es [] = Left $ "No rules matched: " ++ intercalate ", " es
-      go es (r:rs') = case apply n r of
-                       Left e -> go (es++[e]) rs'
-                       Right v -> Right v
+apply n (OneOf rs) =
+    let results = apply n <$> rs
+        successes = rights results
+        failures = lefts results
+    in if null successes
+       then Left $ "No rules matched: " ++ intercalate ", " failures
+       else Right $ head successes
 
 main :: IO ()
 main = do
