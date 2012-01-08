@@ -16,7 +16,7 @@ nodeVal (Node s _) = s
 children :: Node -> [Node]
 children (Node _ ns) = ns
 
--- Validation rules where rules can yield values of type 'a'.
+-- Validation rules which yield validated data.
 data Rule a where
     -- Require that all children of a node satisfy the specified rule.
     AllChildren :: Rule a -> Rule [a]
@@ -27,6 +27,9 @@ data Rule a where
     -- Function application inside rules.
     Apply :: Rule (a -> b) -> Rule a -> Rule b
 
+    -- Disjunction with exactly one match.
+    OneOf :: [Rule a] -> Rule a
+
     -- Custom rule with a description.
     Custom :: String -> (Node -> Rule a) -> Rule a
 
@@ -35,9 +38,6 @@ data Rule a where
 
     -- Signal a rule failure (in custom rules).
     Failed :: String -> Rule a
-
-    -- Disjunction with exactly one match.
-    OneOf :: [Rule a] -> Rule a
 
 instance Show (Rule a) where
     show = render . ruleDoc
