@@ -130,9 +130,11 @@ main = do
                     , Node "6" [ Node "7" []
                                ]
                     ]
-      rule = (,)
-             <$> (hasChildren 2 *> intNode)
-             <*> (AllChildren (Child 0 stringNode))
+      rule = hasChildren 2 *> ((,,,)
+                               <$> intNode
+                               <*> Child 0 stringNode
+                               <*> Child 1 intNode
+                               <*> AllChildren (hasChildren 1 *> Child 0 stringNode))
 
   print t
 
