@@ -17,14 +17,6 @@ children (Node _ ns) = ns
 
 -- Validation rules where rules can yield values of type 'a'.
 data Rule a where
-    -- Check nodes whose values can be encoded in the specified types.
-    IntNode :: Rule Int
-    CharNode :: Rule Char
-    StringNode :: Rule String
-
-    -- Check that the number of children is as expected.
-    HasChildren :: Int -> Rule ()
-
     -- Require that all children of a node satisfy the specified rule.
     AllChildren :: Rule a -> Rule [a]
 
@@ -46,9 +38,6 @@ data Rule a where
     -- Disjunction with exactly one match.
     OneOf :: [Rule a] -> Rule a
 
-    -- Node identity.
-    Id :: Rule Node
-
 instance Show (Rule a) where
     show = render . ruleDoc
 
@@ -67,12 +56,7 @@ instance Alternative Rule where
     a <|> b = OneOf [a, b]
 
 ruleDoc :: Rule a -> Doc
-ruleDoc Id = text "the identity rule"
-ruleDoc IntNode = text "The node has an integer value"
-ruleDoc CharNode = text "The node has a char value"
-ruleDoc StringNode = text "The node has a string value"
 ruleDoc (Const _) = text "Constant"
-ruleDoc (HasChildren n) = text $ "The node has " ++ show n ++ " children"
 ruleDoc (AllChildren r) = text "For each child:" $$ (nest 2 $ ruleDoc r)
 ruleDoc (Apply (Const _) r1) = ruleDoc r1
 ruleDoc (Apply r2 (Const _)) = ruleDoc r2
@@ -82,21 +66,35 @@ ruleDoc (Failed msg) = text $ "Failed: " ++ show msg
 ruleDoc (Custom desc _) = text desc
 ruleDoc (OneOf rs) = text "One of these rules is satisfied:" $$ vcat ((nest 2 . ruleDoc) <$> rs)
 
+-- Some example rules.
+intNode :: Rule Int
+intNode = Custom "the node has an integer value" $
+          \n -> case reads $ nodeVal n of
+                  (v,""):_ -> pure v
+                  _ -> Failed $ "Not an integer: " ++ (show $ nodeVal n)
+
+charNode :: Rule Char
+charNode = Custom "the node has a char value" $
+           \n -> if (length $ nodeVal n) == 1
+                 then pure $ head $ nodeVal n
+                 else Failed $ "Not a character: " ++ (show $ nodeVal n)
+
+stringNode :: Rule String
+stringNode = Custom "the node has a string value" (pure . nodeVal)
+
+identity :: Rule Node
+identity = Custom "the identity rule" (pure . id)
+
+hasChildren :: Int -> Rule ()
+hasChildren num = Custom ("The node has " ++ show num ++ " children") $
+                  \n -> if (length $ children n) == num
+                        then pure ()
+                        else Failed $ show num ++ " children required"
+
 -- Apply a rule to a node, yielding the value checked and computed by
 -- the rule.
 apply :: Node -> Rule a -> Either String a
-apply n Id = Right n
-apply n IntNode = case reads $ nodeVal n of
-                    (v,""):_ -> Right v
-                    _ -> Left $ "Not an integer: " ++ (show $ nodeVal n)
-apply n CharNode = if (length $ nodeVal n) == 1
-                   then Right $ head $ nodeVal n
-                   else Left $ "Not a character: " ++ (show $ nodeVal n)
-apply n StringNode = Right $ nodeVal n
 apply _ (Const a) = Right a
-apply n (HasChildren num) = if (length $ children n) == num
-                            then Right ()
-                            else Left $ show num ++ " children required"
 apply n (AllChildren r) = go [] (children n)
     where
       go vals [] = Right vals
@@ -129,10 +127,9 @@ main = do
                     , Node "6" [ Node "7" []
                                ]
                     ]
-      rule = (,,)
-             <$> (HasChildren 2 *> IntNode)
-             <*> (AllChildren (Child 0 StringNode))
-             <*> (AllChildren (Child 0 StringNode))
+      rule = (,)
+             <$> (hasChildren 2 *> intNode)
+             <*> (AllChildren (Child 0 stringNode))
 
   print t
 
