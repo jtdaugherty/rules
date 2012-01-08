@@ -3,6 +3,7 @@ module Main where
 
 import Prelude hiding ((.))
 import Control.Category ((.))
+import Data.List (intercalate)
 import Text.PrettyPrint (render)
 import Control.Applicative
 
@@ -14,6 +15,8 @@ data Foo = Foo { fooContent :: Int }
 data Node = Node String Foo [Node]
             deriving (Show, Eq)
 
+type Error = [String]
+
 nodeVal :: Node -> String
 nodeVal (Node s _ _) = s
 
@@ -21,41 +24,41 @@ childNodes :: Node -> [Node]
 childNodes (Node _ _ ns) = ns
 
 -- Rules.
-getChild :: Int -> Rule Node Node
+getChild :: Int -> Rule Error Node Node
 getChild num = rule ("Get child node " ++ show num) $
                \n -> if (length $ childNodes n) < num + 1
-                     then failRule $ "Child " ++ show num ++ " not found"
+                     then failRule ["Child " ++ show num ++ " not found"]
                      else pure $ childNodes n !! num
 
-children :: Rule Node [Node]
+children :: Rule Error Node [Node]
 children = rule "Get child nodes" (pure . childNodes)
 
-isIntNode :: Rule Node Int
+isIntNode :: Rule Error Node Int
 isIntNode = rule "the node has an integer value" $
             \n -> case reads $ nodeVal n of
                     (v,""):_ -> pure v
-                    _ -> failRule $ "Not an integer: " ++ (show $ nodeVal n)
+                    _ -> failRule ["Not an integer: " ++ (show $ nodeVal n)]
 
-isCharNode :: Rule Node Char
+isCharNode :: Rule Error Node Char
 isCharNode = rule "the node has a char value" $
              \n -> if (length $ nodeVal n) == 1
                    then pure $ head $ nodeVal n
-                   else failRule $ "Not a character: " ++ (show $ nodeVal n)
+                   else failRule ["Not a character: " ++ (show $ nodeVal n)]
 
-isStringNode :: Rule Node String
+isStringNode :: Rule Error Node String
 isStringNode = rule "the node has a string value" (pure . nodeVal)
 
-hasChildren :: Int -> Rule Node ()
+hasChildren :: Int -> Rule Error Node ()
 hasChildren num = rule ("The node has exactly " ++ show num ++ " children") $
                   \n -> if (length $ childNodes n) == num
                         then pure ()
-                        else failRule $ show num ++ " children required"
+                        else failRule [show num ++ " children required"]
 
-fooRule :: Rule Foo Int
+fooRule :: Rule Error Foo Int
 fooRule = rule "foo has content 5" $
           \foo -> if fooContent foo == 5
                   then pure $ fooContent foo
-                  else failRule "fooContent is wrong"
+                  else failRule ["fooContent is wrong"]
 
 main :: IO ()
 main = do
@@ -81,7 +84,7 @@ main = do
   putStrLn ""
 
   case apply t r of
-    Left e -> putStrLn $ "Rule application failed: " ++ e
+    Left es -> putStrLn $ "Rule application failed: " ++ intercalate "\n" es
     Right val -> do
          putStrLn "Data from applying rule:"
          print val

@@ -27,61 +27,61 @@ where
 import Prelude hiding (id, (.))
 import Control.Category
 import Data.Either (lefts, rights)
-import Data.List (intercalate)
+import Data.Monoid (Monoid, mempty, mconcat)
 import Text.PrettyPrint
 import Control.Applicative
 
 -- |Validation rules which yield validated data.  The idea is that a
 -- rule encapsulates a validation process and also returns the data
--- which was validated.  'Rule's are parameterized on the data
--- structure type under validation (@n@) and the rule result type
--- (@a@).
-data Rule n a where
+-- which was validated.  'Rule's are parameterized on the type of
+-- validation errors (@e@), the type of data structure type under
+-- validation (@n@), and the rule result type (@a@).
+data Rule e n a where
     -- Function application inside rules.
-    Apply :: Rule n (a -> b) -> Rule n a -> Rule n b
+    Apply :: Rule e n (a -> b) -> Rule e n a -> Rule e n b
 
     -- Disjunction with exactly one match.
-    OneOf :: [Rule n a] -> Rule n a
+    OneOf :: [Rule e n a] -> Rule e n a
 
     -- User-defined rule with a description.
-    Rule :: String -> (n -> Rule n a) -> Rule n a
+    Rule :: String -> (n -> Rule e n a) -> Rule e n a
 
     -- Embed a constant value in a rule.
-    Pure :: a -> Rule n a
+    Pure :: a -> Rule e n a
 
     -- Signal a rule failure (in custom rules).
-    Failed :: String -> Rule n a
+    Failed :: e -> Rule e n a
 
     -- Compose rules on structure type.
-    Compose :: Rule a b -> Rule n a -> Rule n b
+    Compose :: Rule e a b -> Rule e n a -> Rule e n b
 
     -- Iteration rule.
-    Foreach :: Rule a [b] -> Rule b c -> Rule a [c]
+    Foreach :: Rule e a [b] -> Rule e b c -> Rule e a [c]
 
-instance Functor (Rule n) where
+instance Functor (Rule e n) where
     fmap f r = Apply (Pure f) r
 
-instance Applicative (Rule n) where
+instance Applicative (Rule e n) where
     pure = Pure
     (<*>) = Apply
 
-instance Alternative (Rule n) where
-    empty = Failed "empty"
+instance (Monoid e) => Alternative (Rule e n) where
+    empty = Failed mempty
     (OneOf as) <|> (OneOf bs) = OneOf $ as ++ bs
     (OneOf as) <|> b = OneOf $ as ++ [b]
     a <|> (OneOf bs) = OneOf $ a : bs
     a <|> b = OneOf [a, b]
 
-instance Category Rule where
+instance Category (Rule e) where
     id = Rule "the identity rule" (pure . id)
     r2 . r1 = Compose r2 r1
 
 -- |For each element yielded by a rule, apply another rule.
-foreach :: Rule a [b] -> Rule b c -> Rule a [c]
+foreach :: Rule e a [b] -> Rule e b c -> Rule e a [c]
 foreach = Foreach
 
 -- |A rule indicating failure with the given message.
-failRule :: String -> Rule n a
+failRule :: e -> Rule e n a
 failRule = Failed
 
 -- |Create a new rule with the given description and implementation.
@@ -89,20 +89,20 @@ failRule = Failed
 -- precisely match the description so that the printed version of this
 -- rule is sufficiently descriptive to the user of the data structure
 -- under validation.
-rule :: String -> (n -> Rule n a) -> Rule n a
+rule :: String -> (n -> Rule e n a) -> Rule e n a
 rule = Rule
 
 -- |Pretty-print a rule.  Note that the quality of the printed rule
 -- depends largely on the quality of the descriptions of the rules
 -- used within.
-ruleDoc :: Rule n a -> Doc
+ruleDoc :: (Show e) => Rule e n a -> Doc
 ruleDoc (Pure _) = text "Constant"
 ruleDoc (Apply (Pure _) r1) = ruleDoc r1
 ruleDoc (Apply r2 (Pure _)) = ruleDoc r2
 ruleDoc (Apply r2 r1) = vcat [ ruleDoc r2
                              , ruleDoc r1
                              ]
-ruleDoc (Failed msg) = text $ "Failed: " ++ show msg
+ruleDoc (Failed e) = text $ "Failed: " ++ show e
 ruleDoc (Rule desc _) = text desc
 ruleDoc (OneOf rs) = vcat [ text "One of these rules is satisfied:"
                           , vcat $ (nest 2 . ruleDoc) <$> rs
@@ -118,7 +118,7 @@ ruleDoc (Foreach things r) = vcat [ text "for each of"
 
 -- |Apply a rule to an input value, yielding the value checked and
 -- computed by the rule.
-apply :: n -> Rule n a -> Either String a
+apply :: (Monoid e) => n -> Rule e n a -> Either e a
 apply _ (Pure a) = Right a
 apply _ (Failed e) = Left e
 apply n (Rule _ f) = apply n (f n)
@@ -135,7 +135,7 @@ apply n (OneOf rs) =
         failures = lefts results
     in if not $ null successes
        then Right $ head successes
-       else Left $ "No rules matched: " ++ intercalate ", " failures
+       else Left $ mconcat failures
 apply n (Compose r2 r1) = do
   v <- apply n r1
   apply v r2
