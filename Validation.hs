@@ -69,12 +69,22 @@ ruleDoc :: Rule n a -> Doc
 ruleDoc (Const _) = text "Constant"
 ruleDoc (Apply (Const _) r1) = ruleDoc r1
 ruleDoc (Apply r2 (Const _)) = ruleDoc r2
-ruleDoc (Apply r2 r1) = (ruleDoc r2) $$ (ruleDoc r1)
+ruleDoc (Apply r2 r1) = vcat [ ruleDoc r2
+                             , ruleDoc r1
+                             ]
 ruleDoc (Failed msg) = text $ "Failed: " ++ show msg
 ruleDoc (Rule desc _) = text desc
-ruleDoc (OneOf rs) = text "One of these rules is satisfied:" $$ vcat ((nest 2 . ruleDoc) <$> rs)
-ruleDoc (Compose r2 r1) = text "compose" <+> (ruleDoc r2) $$ (nest 2 $ text "with" <+> ruleDoc r1)
-ruleDoc (Foreach things r) = text "for each of" $$ (nest 2 $ ruleDoc things) $$ text "satisfy" $$ (nest 2 $ ruleDoc r)
+ruleDoc (OneOf rs) = vcat [ text "One of these rules is satisfied:"
+                          , vcat $ (nest 2 . ruleDoc) <$> rs
+                          ]
+ruleDoc (Compose r2 r1) = vcat [ text "compose" <+> (ruleDoc r2)
+                               , nest 2 $ text "with" <+> ruleDoc r1
+                               ]
+ruleDoc (Foreach things r) = vcat [ text "for each of"
+                                  , nest 2 $ ruleDoc things
+                                  , text "satisfy"
+                                  , nest 2 $ ruleDoc r
+                                  ]
 
 -- Some example rules.
 intNode :: Rule Node Int
