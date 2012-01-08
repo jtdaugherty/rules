@@ -7,7 +7,7 @@ import Control.Category
 import Data.Either (lefts, rights)
 import Data.List (intercalate)
 import Text.PrettyPrint
-import Control.Applicative hiding (Const)
+import Control.Applicative
 
 data Foo = Foo { fooContent :: Int }
            deriving (Show, Eq)
@@ -33,7 +33,7 @@ data Rule n a where
     Rule :: String -> (n -> Rule n a) -> Rule n a
 
     -- Embed a constant value in a rule.
-    Const :: a -> Rule n a
+    Pure :: a -> Rule n a
 
     -- Signal a rule failure (in custom rules).
     Failed :: String -> Rule n a
@@ -45,10 +45,10 @@ data Rule n a where
     Foreach :: Rule a [b] -> Rule b c -> Rule a [c]
 
 instance Functor (Rule n) where
-    fmap f r = Apply (Const f) r
+    fmap f r = Apply (Pure f) r
 
 instance Applicative (Rule n) where
-    pure = Const
+    pure = Pure
     (<*>) = Apply
 
 instance Alternative (Rule n) where
@@ -63,9 +63,9 @@ instance Category Rule where
     r2 . r1 = Compose r2 r1
 
 ruleDoc :: Rule n a -> Doc
-ruleDoc (Const _) = text "Constant"
-ruleDoc (Apply (Const _) r1) = ruleDoc r1
-ruleDoc (Apply r2 (Const _)) = ruleDoc r2
+ruleDoc (Pure _) = text "Constant"
+ruleDoc (Apply (Pure _) r1) = ruleDoc r1
+ruleDoc (Apply r2 (Pure _)) = ruleDoc r2
 ruleDoc (Apply r2 r1) = vcat [ ruleDoc r2
                              , ruleDoc r1
                              ]
@@ -86,7 +86,7 @@ ruleDoc (Foreach things r) = vcat [ text "for each of"
 -- Apply a rule to a node, yielding the value checked and computed by
 -- the rule.
 apply :: n -> Rule n a -> Either String a
-apply _ (Const a) = Right a
+apply _ (Pure a) = Right a
 apply _ (Failed e) = Left e
 apply n (Rule _ f) = apply n (f n)
 apply n (Apply r2 r1) = do
