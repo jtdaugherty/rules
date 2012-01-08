@@ -2,28 +2,27 @@
 {-# LANGUAGE GADTs #-}
 module Main where
 
+import Prelude hiding (id, (.))
+import Control.Category
 import Data.Either (lefts, rights)
 import Data.List (intercalate)
 import Text.PrettyPrint
 import Control.Applicative hiding (Const)
 
-data Node = Node String [Node]
+data Foo = Foo { fooContent :: Int }
+           deriving (Show, Eq)
+
+data Node = Node String Foo [Node]
             deriving (Show, Eq)
 
 nodeVal :: Node -> String
-nodeVal (Node s _) = s
+nodeVal (Node s _ _) = s
 
 children :: Node -> [Node]
-children (Node _ ns) = ns
+children (Node _ _ ns) = ns
 
 -- Validation rules which yield validated data.
 data Rule n a where
-    -- Require that all children of a node satisfy the specified rule.
-    AllChildren :: Rule n a -> Rule n [a]
-
-    -- Apply a rule to the specified child.
-    Child :: Int -> Rule n a -> Rule n a
-
     -- Function application inside rules.
     Apply :: Rule n (a -> b) -> Rule n a -> Rule n b
 
@@ -38,6 +37,12 @@ data Rule n a where
 
     -- Signal a rule failure (in custom rules).
     Failed :: String -> Rule n a
+
+    -- Compose rules on structure type.
+    Compose :: Rule a b -> Rule n a -> Rule n b
+
+    -- Iteration rule.
+    Foreach :: Rule a [b] -> Rule b c -> Rule a [c]
 
 instance Show (Rule n a) where
     show = render . ruleDoc
@@ -56,16 +61,20 @@ instance Alternative (Rule n) where
     a <|> (OneOf bs) = OneOf $ a : bs
     a <|> b = OneOf [a, b]
 
+instance Category Rule where
+    id = Custom "the identity rule" (pure . id)
+    r2 . r1 = Compose r2 r1
+
 ruleDoc :: Rule n a -> Doc
 ruleDoc (Const _) = text "Constant"
-ruleDoc (AllChildren r) = text "For each child:" $$ (nest 2 $ ruleDoc r)
 ruleDoc (Apply (Const _) r1) = ruleDoc r1
 ruleDoc (Apply r2 (Const _)) = ruleDoc r2
 ruleDoc (Apply r2 r1) = (ruleDoc r2) $$ (ruleDoc r1)
-ruleDoc (Child n r) = (text $ "Child " ++ show n ++ " satisfies:") $$ (nest 2 $ ruleDoc r)
 ruleDoc (Failed msg) = text $ "Failed: " ++ show msg
 ruleDoc (Custom desc _) = text desc
 ruleDoc (OneOf rs) = text "One of these rules is satisfied:" $$ vcat ((nest 2 . ruleDoc) <$> rs)
+ruleDoc (Compose r2 r1) = text "compose" <+> (ruleDoc r2) $$ (nest 2 $ text "with" <+> ruleDoc r1)
+ruleDoc (Foreach things r) = text "for each of" $$ (nest 2 $ ruleDoc things) $$ text "satisfy" $$ (nest 2 $ ruleDoc r)
 
 -- Some example rules.
 intNode :: Rule Node Int
@@ -83,41 +92,31 @@ charNode = Custom "the node has a char value" $
 stringNode :: Rule Node String
 stringNode = Custom "the node has a string value" (pure . nodeVal)
 
-identity :: Rule n n
-identity = Custom "the identity rule" (pure . id)
-
 hasChildren :: Int -> Rule Node ()
-hasChildren num = Custom ("The node has " ++ show num ++ " children") $
+hasChildren num = Custom ("The node has exactly " ++ show num ++ " children") $
                   \n -> if (length $ children n) == num
                         then pure ()
                         else Failed $ show num ++ " children required"
 
-getChild :: Node -> Int -> Either String Node
-getChild n num
-    | (length $ children n) < num + 1 =
-        Left $ "Child " ++ show num ++ " not found"
-    | otherwise = Right $ children n !! num
+fooRule :: Rule Foo Int
+fooRule = Custom "foo has content 5" $
+          \foo -> if fooContent foo == 5
+                  then pure $ fooContent foo
+                  else Failed "fooContent is wrong"
 
 -- Apply a rule to a node, yielding the value checked and computed by
 -- the rule.
-apply :: Node -> Rule Node a -> Either String a
+apply :: n -> Rule n a -> Either String a
 apply _ (Const a) = Right a
 apply _ (Failed e) = Left e
 apply n (Custom _ f) = apply n (f n)
-apply n (Child num r) = do
-  child <- getChild n num
-  apply child r
 apply n (Apply r2 r1) = do
   f <- apply n r2
   v <- apply n r1
   return $ f v
-apply n (AllChildren r) = go [] (children n)
-    where
-      go vals [] = return vals
-      go vals (c:cs) = do
-        -- Fail on children for which the rule is not satisfied.
-        val <- apply c r
-        go (vals ++ [val]) cs
+apply n (Foreach things r) = do
+  values <- apply n things
+  mapM (flip apply r) values
 apply n (OneOf rs) =
     let results = apply n <$> rs
         successes = rights results
@@ -125,18 +124,35 @@ apply n (OneOf rs) =
     in if not $ null successes
        then Right $ head successes
        else Left $ "No rules matched: " ++ intercalate ", " failures
+apply n (Compose r2 r1) = do
+  v <- apply n r1
+  apply v r2
+
+getChild :: Int -> Rule Node Node
+getChild num = Custom ("Get child node " ++ show num) $
+               \n -> if (length $ children n) < num + 1
+                     then Failed $ "Child " ++ show num ++ " not found"
+                     else pure $ children n !! num
+
+getChildren :: Rule Node [Node]
+getChildren = Custom "Get child nodes" (pure . children)
 
 main :: IO ()
 main = do
-  let t = Node "13" [ Node "foo bar" [Node "flurb" []]
-                    , Node "6" [ Node "7" []
-                               ]
-                    ]
-      rule = hasChildren 2 *> ((,,,)
+  let t = Node "13" (Foo 1) [ Node "foo bar" (Foo 2) [Node "192" (Foo 3) []]
+                            , Node "6" (Foo 4) [ Node "7" (Foo 5) []
+                                               ]
+                            ]
+      getFoo = Custom "get the foo value" $
+               \(Node _ f _) -> Const f
+      rule = hasChildren 2 *> ((,,,,,)
                                <$> intNode
-                               <*> Child 0 stringNode
-                               <*> Child 1 intNode
-                               <*> AllChildren (hasChildren 1 *> Child 0 stringNode))
+                               <*> ((fooRule . getFoo) <|> Const 1)
+                               <*> stringNode . getChild 0
+                               <*> intNode . getChild 1
+                               <*> ((nodeVal <$>) <$> getChildren)
+                               <*> (Foreach getChildren $ Foreach getChildren intNode)
+                              )
 
   print t
 
