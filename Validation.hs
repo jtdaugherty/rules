@@ -117,20 +117,20 @@ getChild num = Rule ("Get child node " ++ show num) $
 children :: Rule Node [Node]
 children = Rule "Get child nodes" (pure . childNodes)
 
-intNode :: Rule Node Int
-intNode = Rule "the node has an integer value" $
-          \n -> case reads $ nodeVal n of
-                  (v,""):_ -> pure v
-                  _ -> Failed $ "Not an integer: " ++ (show $ nodeVal n)
+isIntNode :: Rule Node Int
+isIntNode = Rule "the node has an integer value" $
+            \n -> case reads $ nodeVal n of
+                    (v,""):_ -> pure v
+                    _ -> Failed $ "Not an integer: " ++ (show $ nodeVal n)
 
-charNode :: Rule Node Char
-charNode = Rule "the node has a char value" $
-           \n -> if (length $ nodeVal n) == 1
-                 then pure $ head $ nodeVal n
-                 else Failed $ "Not a character: " ++ (show $ nodeVal n)
+isCharNode :: Rule Node Char
+isCharNode = Rule "the node has a char value" $
+             \n -> if (length $ nodeVal n) == 1
+                   then pure $ head $ nodeVal n
+                   else Failed $ "Not a character: " ++ (show $ nodeVal n)
 
-stringNode :: Rule Node String
-stringNode = Rule "the node has a string value" (pure . nodeVal)
+isStringNode :: Rule Node String
+isStringNode = Rule "the node has a string value" (pure . nodeVal)
 
 hasChildren :: Int -> Rule Node ()
 hasChildren num = Rule ("The node has exactly " ++ show num ++ " children") $
@@ -153,12 +153,12 @@ main = do
       getFoo = Rule "get the foo value" $
                \(Node _ f _) -> pure f
       rule = hasChildren 2 *> ((,,,,,)
-                               <$> intNode
+                               <$> isIntNode
                                <*> ((fooRule . getFoo) <|> pure 1)
-                               <*> stringNode . getChild 0
-                               <*> intNode . getChild 1
+                               <*> isStringNode . getChild 0
+                               <*> isIntNode . getChild 1
                                <*> ((nodeVal <$>) <$> children)
-                               <*> (Foreach children $ Foreach children intNode)
+                               <*> (Foreach children $ Foreach children isIntNode)
                               )
 
   print t
