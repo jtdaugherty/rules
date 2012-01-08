@@ -1,0 +1,38 @@
+Name:                rules
+Version:             0.1
+Synopsis:
+  A library for structured data validation and extraction
+
+Description:
+  A library for structured data validation and extraction
+
+Category:            Data
+Author:              Jonathan Daugherty <jtd@galois.com>
+Maintainer:          Jonathan Daugherty <jtd@galois.com>
+Build-Type:          Simple
+License:             BSD3
+License-File:        LICENSE
+Cabal-Version:       >= 1.6
+Homepage:            http://codevine.org/vty-ui/
+
+Source-Repository head
+  type:     git
+  location: git://github.com/jtdaugherty/rules.git
+
+Library
+  Build-Depends:
+    base >= 4 && < 5,
+    pretty >= 1.0 && < 1.1
+
+  GHC-Options:       -Wall
+
+  Hs-Source-Dirs:    src
+  Exposed-Modules:
+      Data.Validation.Rules
+
+Executable rules-demo
+  Hs-Source-Dirs:  src
+  GHC-Options:     -Wall
+  Main-is:         Demo.hs
+  Build-Depends:
+    base >= 4 && < 5

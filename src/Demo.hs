@@ -5,7 +5,8 @@ import Prelude hiding ((.))
 import Control.Category ((.))
 import Text.PrettyPrint (render)
 import Control.Applicative
-import Rules
+
+import Data.Validation.Rules
 
 data Foo = Foo { fooContent :: Int }
            deriving (Show, Eq)

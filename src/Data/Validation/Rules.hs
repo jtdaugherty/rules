@@ -1,6 +1,5 @@
-{-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE GADTs #-}
-module Rules
+module Data.Validation.Rules
     ( Rule(Rule)
     , foreach
     , failRule
