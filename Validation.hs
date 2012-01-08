@@ -122,9 +122,9 @@ apply n (OneOf rs) =
     let results = apply n <$> rs
         successes = rights results
         failures = lefts results
-    in if null successes
-       then Left $ "No rules matched: " ++ intercalate ", " failures
-       else Right $ head successes
+    in if not $ null successes
+       then Right $ head successes
+       else Left $ "No rules matched: " ++ intercalate ", " failures
 
 main :: IO ()
 main = do
