@@ -13,12 +13,12 @@
 -- from simple rules by using the type classes instanced by 'Rule'.
 module Data.Validation.Rules
     ( Rule
-    -- * Applying Rules
-    , apply
     -- * Creating Rules
     , rule
     , foreach
     , failRule
+    -- * Applying Rules
+    , apply
     -- * Pretty-Printing Rules
     , ruleDoc
     )
