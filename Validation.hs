@@ -17,46 +17,46 @@ children :: Node -> [Node]
 children (Node _ ns) = ns
 
 -- Validation rules which yield validated data.
-data Rule a where
+data Rule n a where
     -- Require that all children of a node satisfy the specified rule.
-    AllChildren :: Rule a -> Rule [a]
+    AllChildren :: Rule n a -> Rule n [a]
 
     -- Apply a rule to the specified child.
-    Child :: Int -> Rule a -> Rule a
+    Child :: Int -> Rule n a -> Rule n a
 
     -- Function application inside rules.
-    Apply :: Rule (a -> b) -> Rule a -> Rule b
+    Apply :: Rule n (a -> b) -> Rule n a -> Rule n b
 
     -- Disjunction with exactly one match.
-    OneOf :: [Rule a] -> Rule a
+    OneOf :: [Rule n a] -> Rule n a
 
     -- Custom rule with a description.
-    Custom :: String -> (Node -> Rule a) -> Rule a
+    Custom :: String -> (n -> Rule n a) -> Rule n a
 
     -- Embed a constant value in a rule.
-    Const :: a -> Rule a
+    Const :: a -> Rule n a
 
     -- Signal a rule failure (in custom rules).
-    Failed :: String -> Rule a
+    Failed :: String -> Rule n a
 
-instance Show (Rule a) where
+instance Show (Rule n a) where
     show = render . ruleDoc
 
-instance Functor Rule where
+instance Functor (Rule n) where
     fmap f r = Apply (Const f) r
 
-instance Applicative Rule where
+instance Applicative (Rule n) where
     pure = Const
     r2 <*> r1 = Apply r2 r1
 
-instance Alternative Rule where
+instance Alternative (Rule n) where
     empty = Failed "empty"
     (OneOf as) <|> (OneOf bs) = OneOf $ as ++ bs
     (OneOf as) <|> b = OneOf $ as ++ [b]
     a <|> (OneOf bs) = OneOf $ a : bs
     a <|> b = OneOf [a, b]
 
-ruleDoc :: Rule a -> Doc
+ruleDoc :: Rule n a -> Doc
 ruleDoc (Const _) = text "Constant"
 ruleDoc (AllChildren r) = text "For each child:" $$ (nest 2 $ ruleDoc r)
 ruleDoc (Apply (Const _) r1) = ruleDoc r1
@@ -68,25 +68,25 @@ ruleDoc (Custom desc _) = text desc
 ruleDoc (OneOf rs) = text "One of these rules is satisfied:" $$ vcat ((nest 2 . ruleDoc) <$> rs)
 
 -- Some example rules.
-intNode :: Rule Int
+intNode :: Rule Node Int
 intNode = Custom "the node has an integer value" $
           \n -> case reads $ nodeVal n of
                   (v,""):_ -> pure v
                   _ -> Failed $ "Not an integer: " ++ (show $ nodeVal n)
 
-charNode :: Rule Char
+charNode :: Rule Node Char
 charNode = Custom "the node has a char value" $
            \n -> if (length $ nodeVal n) == 1
                  then pure $ head $ nodeVal n
                  else Failed $ "Not a character: " ++ (show $ nodeVal n)
 
-stringNode :: Rule String
+stringNode :: Rule Node String
 stringNode = Custom "the node has a string value" (pure . nodeVal)
 
-identity :: Rule Node
+identity :: Rule n n
 identity = Custom "the identity rule" (pure . id)
 
-hasChildren :: Int -> Rule ()
+hasChildren :: Int -> Rule Node ()
 hasChildren num = Custom ("The node has " ++ show num ++ " children") $
                   \n -> if (length $ children n) == num
                         then pure ()
@@ -100,7 +100,7 @@ getChild n num
 
 -- Apply a rule to a node, yielding the value checked and computed by
 -- the rule.
-apply :: Node -> Rule a -> Either String a
+apply :: Node -> Rule Node a -> Either String a
 apply _ (Const a) = Right a
 apply _ (Failed e) = Left e
 apply n (Custom _ f) = apply n (f n)
