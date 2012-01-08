@@ -97,21 +97,20 @@ apply :: Node -> Rule a -> Either String a
 apply _ (Const a) = Right a
 apply n (AllChildren r) = go [] (children n)
     where
-      go vals [] = Right vals
-      go vals (c:cs) = case apply c r of
-                         Left e -> Left e
-                         Right val -> go (vals ++ [val]) cs
+      go vals [] = return vals
+      go vals (c:cs) = do
+        -- Fail on children for which the rule is not satisfied.
+        val <- apply c r
+        go (vals ++ [val]) cs
 apply n (Child num r) =
     if ((length $ children n) - 1) < num
     then Left $ "Child " ++ show num ++ " not found"
     else let child = children n !! num
          in apply child r
-apply n (Apply r2 r1) =
-    case apply n r2 of
-      Left e -> Left e
-      Right f -> case apply n r1 of
-                   Left e' -> Left e'
-                   Right v -> Right $ f v
+apply n (Apply r2 r1) = do
+  f <- apply n r2
+  v <- apply n r1
+  return $ f v
 apply n (Custom _ f) = apply n (f n)
 apply _ (Failed e) = Left e
 apply n (OneOf rs) = go [] rs
