@@ -29,8 +29,8 @@ data Rule n a where
     -- Disjunction with exactly one match.
     OneOf :: [Rule n a] -> Rule n a
 
-    -- Custom rule with a description.
-    Custom :: String -> (n -> Rule n a) -> Rule n a
+    -- User-defined rule with a description.
+    Rule :: String -> (n -> Rule n a) -> Rule n a
 
     -- Embed a constant value in a rule.
     Const :: a -> Rule n a
@@ -62,7 +62,7 @@ instance Alternative (Rule n) where
     a <|> b = OneOf [a, b]
 
 instance Category Rule where
-    id = Custom "the identity rule" (pure . id)
+    id = Rule "the identity rule" (pure . id)
     r2 . r1 = Compose r2 r1
 
 ruleDoc :: Rule n a -> Doc
@@ -71,35 +71,35 @@ ruleDoc (Apply (Const _) r1) = ruleDoc r1
 ruleDoc (Apply r2 (Const _)) = ruleDoc r2
 ruleDoc (Apply r2 r1) = (ruleDoc r2) $$ (ruleDoc r1)
 ruleDoc (Failed msg) = text $ "Failed: " ++ show msg
-ruleDoc (Custom desc _) = text desc
+ruleDoc (Rule desc _) = text desc
 ruleDoc (OneOf rs) = text "One of these rules is satisfied:" $$ vcat ((nest 2 . ruleDoc) <$> rs)
 ruleDoc (Compose r2 r1) = text "compose" <+> (ruleDoc r2) $$ (nest 2 $ text "with" <+> ruleDoc r1)
 ruleDoc (Foreach things r) = text "for each of" $$ (nest 2 $ ruleDoc things) $$ text "satisfy" $$ (nest 2 $ ruleDoc r)
 
 -- Some example rules.
 intNode :: Rule Node Int
-intNode = Custom "the node has an integer value" $
+intNode = Rule "the node has an integer value" $
           \n -> case reads $ nodeVal n of
                   (v,""):_ -> pure v
                   _ -> Failed $ "Not an integer: " ++ (show $ nodeVal n)
 
 charNode :: Rule Node Char
-charNode = Custom "the node has a char value" $
+charNode = Rule "the node has a char value" $
            \n -> if (length $ nodeVal n) == 1
                  then pure $ head $ nodeVal n
                  else Failed $ "Not a character: " ++ (show $ nodeVal n)
 
 stringNode :: Rule Node String
-stringNode = Custom "the node has a string value" (pure . nodeVal)
+stringNode = Rule "the node has a string value" (pure . nodeVal)
 
 hasChildren :: Int -> Rule Node ()
-hasChildren num = Custom ("The node has exactly " ++ show num ++ " children") $
+hasChildren num = Rule ("The node has exactly " ++ show num ++ " children") $
                   \n -> if (length $ children n) == num
                         then pure ()
                         else Failed $ show num ++ " children required"
 
 fooRule :: Rule Foo Int
-fooRule = Custom "foo has content 5" $
+fooRule = Rule "foo has content 5" $
           \foo -> if fooContent foo == 5
                   then pure $ fooContent foo
                   else Failed "fooContent is wrong"
@@ -109,7 +109,7 @@ fooRule = Custom "foo has content 5" $
 apply :: n -> Rule n a -> Either String a
 apply _ (Const a) = Right a
 apply _ (Failed e) = Left e
-apply n (Custom _ f) = apply n (f n)
+apply n (Rule _ f) = apply n (f n)
 apply n (Apply r2 r1) = do
   f <- apply n r2
   v <- apply n r1
@@ -129,13 +129,13 @@ apply n (Compose r2 r1) = do
   apply v r2
 
 getChild :: Int -> Rule Node Node
-getChild num = Custom ("Get child node " ++ show num) $
+getChild num = Rule ("Get child node " ++ show num) $
                \n -> if (length $ children n) < num + 1
                      then Failed $ "Child " ++ show num ++ " not found"
                      else pure $ children n !! num
 
 getChildren :: Rule Node [Node]
-getChildren = Custom "Get child nodes" (pure . children)
+getChildren = Rule "Get child nodes" (pure . children)
 
 main :: IO ()
 main = do
@@ -143,7 +143,7 @@ main = do
                             , Node "6" (Foo 4) [ Node "7" (Foo 5) []
                                                ]
                             ]
-      getFoo = Custom "get the foo value" $
+      getFoo = Rule "get the foo value" $
                \(Node _ f _) -> pure f
       rule = hasChildren 2 *> ((,,,,,)
                                <$> intNode
