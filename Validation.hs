@@ -44,9 +44,6 @@ data Rule n a where
     -- Iteration rule.
     Foreach :: Rule a [b] -> Rule b c -> Rule a [c]
 
-instance Show (Rule n a) where
-    show = render . ruleDoc
-
 instance Functor (Rule n) where
     fmap f r = Apply (Const f) r
 
@@ -167,7 +164,7 @@ main = do
   print t
 
   putStrLn "Rule:"
-  putStrLn $ show rule
+  putStrLn $ render $ ruleDoc rule
   putStrLn ""
 
   case apply t rule of
