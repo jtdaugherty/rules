@@ -14,7 +14,16 @@ import Data.List (intercalate)
 import Text.PrettyPrint
 import Control.Applicative
 
--- Validation rules which yield validated data.
+-- Validation rules which yield validated data.  The idea is that a
+-- rule encapsulates a validation process and also returns the data
+-- which was validated (what I call the "residue" of the validation).
+--
+-- For example, a rule which checks that a string represents an
+-- integer value would do the check and, if successful, would return
+-- the integer value in question.  Furthermore, this approach intends
+-- to produce "self-documenting" rules which can be inspected and
+-- printed out so that the documentation of validation requirements
+-- can never be out of sync with the implementation.
 data Rule n a where
     -- Function application inside rules.
     Apply :: Rule n (a -> b) -> Rule n a -> Rule n b
