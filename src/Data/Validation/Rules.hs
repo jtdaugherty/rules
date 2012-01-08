@@ -6,6 +6,11 @@
 -- validation rules in such a way that the rules can be used to
 -- generate documentation about validation requirements, while also
 -- decoupling the rules from the structure of the validated data.
+--
+-- For example, a rule which checks that a string represents an
+-- integer value would do the check and, if successful, would return
+-- the integer value in question.  More complex rules can be built up
+-- from simple rules by using the type classes instanced by 'Rule'.
 module Data.Validation.Rules
     ( Rule
     -- * Applying Rules
@@ -31,13 +36,6 @@ import Control.Applicative
 -- which was validated.  'Rule's are parameterized on the data
 -- structure type under validation (@n@) and the rule result type
 -- (@a@).
---
--- For example, a rule which checks that a string represents an
--- integer value would do the check and, if successful, would return
--- the integer value in question.  Furthermore, this approach intends
--- to produce ''self-documenting'' rules which can be inspected and
--- printed out so that the documentation of validation requirements
--- can never be out of sync with the implementation.
 data Rule n a where
     -- Function application inside rules.
     Apply :: Rule n (a -> b) -> Rule n a -> Rule n b
