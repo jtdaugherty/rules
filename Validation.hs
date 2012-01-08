@@ -144,10 +144,10 @@ main = do
                                                ]
                             ]
       getFoo = Custom "get the foo value" $
-               \(Node _ f _) -> Const f
+               \(Node _ f _) -> pure f
       rule = hasChildren 2 *> ((,,,,,)
                                <$> intNode
-                               <*> ((fooRule . getFoo) <|> Const 1)
+                               <*> ((fooRule . getFoo) <|> pure 1)
                                <*> stringNode . getChild 0
                                <*> intNode . getChild 1
                                <*> ((nodeVal <$>) <$> getChildren)
