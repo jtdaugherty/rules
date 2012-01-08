@@ -1,9 +1,20 @@
 {-# LANGUAGE GADTs #-}
+-- |Validation of structured data typically entails traversal of a
+-- structure to produce either a failure value indicating the specific
+-- failure or a ''validated'' value which can be used for subsequent
+-- computations.  This module provides a 'Rule' type for expressing
+-- validation rules in such a way that the rules can be used to
+-- generate documentation about validation requirements, while also
+-- decoupling the rules from the structure of the validated data.
 module Data.Validation.Rules
-    ( Rule(Rule)
+    ( Rule
+    -- * Applying Rules
+    , apply
+    -- * Creating Rules
+    , rule
     , foreach
     , failRule
-    , apply
+    -- * Pretty-Printing Rules
     , ruleDoc
     )
 where
@@ -15,14 +26,15 @@ import Data.List (intercalate)
 import Text.PrettyPrint
 import Control.Applicative
 
--- Validation rules which yield validated data.  The idea is that a
+-- |Validation rules which yield validated data.  The idea is that a
 -- rule encapsulates a validation process and also returns the data
--- which was validated (what I call the "residue" of the validation).
+-- which was validated.  'Rule's are parameterized on the data
+-- structure type, @n@, and the rule result type, @a@.
 --
 -- For example, a rule which checks that a string represents an
 -- integer value would do the check and, if successful, would return
 -- the integer value in question.  Furthermore, this approach intends
--- to produce "self-documenting" rules which can be inspected and
+-- to produce ''self-documenting'' rules which can be inspected and
 -- printed out so that the documentation of validation requirements
 -- can never be out of sync with the implementation.
 data Rule n a where
@@ -65,12 +77,25 @@ instance Category Rule where
     id = Rule "the identity rule" (pure . id)
     r2 . r1 = Compose r2 r1
 
+-- |For each element yielded by a rule, apply another rule.
 foreach :: Rule a [b] -> Rule b c -> Rule a [c]
 foreach = Foreach
 
+-- |A rule indicating failure with the given message.
 failRule :: String -> Rule n a
 failRule = Failed
 
+-- |Create a new rule with the given description and implementation.
+-- /NOTE:/ Bear in mind that the behavior of the implementation should
+-- precisely match the description so that the printed version of this
+-- rule is sufficiently descriptive to the user of the data structure
+-- under validation.
+rule :: String -> (n -> Rule n a) -> Rule n a
+rule = Rule
+
+-- |Pretty-print a rule.  Note that the quality of the printed rule
+-- depends largely on the quality of the descriptions of the rules
+-- used within.
 ruleDoc :: Rule n a -> Doc
 ruleDoc (Pure _) = text "Constant"
 ruleDoc (Apply (Pure _) r1) = ruleDoc r1
@@ -92,8 +117,8 @@ ruleDoc (Foreach things r) = vcat [ text "for each of"
                                   , nest 2 $ ruleDoc r
                                   ]
 
--- Apply a rule to a node, yielding the value checked and computed by
--- the rule.
+-- |Apply a rule to an input value, yielding the value checked and
+-- computed by the rule.
 apply :: n -> Rule n a -> Either String a
 apply _ (Pure a) = Right a
 apply _ (Failed e) = Left e

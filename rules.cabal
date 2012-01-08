@@ -4,7 +4,13 @@ Synopsis:
   A library for structured data validation and extraction
 
 Description:
-  A library for structured data validation and extraction
+  Validation of structured data typically entails traversal of a
+  structure to produce either a failure value indicating the specific
+  failure or a ''validated'' value which can be used for subsequent
+  computations. This package provides mechanisms for expressing
+  validation rules in such a way that the rules can be used to
+  generate documentation about validation requirements, while also
+  decoupling the rules from the structure of the validated data.
 
 Category:            Data
 Author:              Jonathan Daugherty <jtd@galois.com>
